@@ -15,7 +15,7 @@ from os import getenv
 
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from aiogram.utils.markdown import hbold
 
@@ -57,6 +57,19 @@ async def command_start_handler(message: Message) -> None:
     # Bot instance: `bot.send_message(chat_id=message.chat.id, ...)`
     await message.answer(f"Hello, {hbold(message.from_user.full_name)}!")
     db[message.from_user.id] = Game()
+
+
+@dp.message(Command("reset"))
+async def command_reset_handler(message: Message) -> None:
+    """
+    This handler receives messages with `/reset` command
+    """
+    if message.from_user.id not in db:
+        await message.answer("Start a game first")
+        return
+    game = db[message.from_user.id]
+    game.reset()
+    await message.answer("Game reset")
 
 
 @dp.message()
