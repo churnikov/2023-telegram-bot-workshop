@@ -1,4 +1,5 @@
 import os
+import random
 
 from dotenv import load_dotenv
 
@@ -16,6 +17,8 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from aiogram.utils.markdown import hbold
+from aiogram.types.keyboard_button import KeyboardButton
+from aiogram.types.reply_keyboard_markup import ReplyKeyboardMarkup
 
 # Bot token can be obtained via https://t.me/BotFather
 
@@ -24,9 +27,8 @@ dp = Dispatcher()
 
 class Game:
     def __init__(self):
-        self.number = random.randint(1, 100)
-        self.guesses = 0
-        self.max_guesses = 10
+        self.reset()
+
     def guess(self, number):
         if self.guesses >= self.max_guesses:
             return f"You have no more guesses left. The number was {self.number}"
@@ -34,11 +36,30 @@ class Game:
         if number == self.number:
             return "You guessed it!"
         elif number < self.number:
+            self.current_min = number + 1
             return "Too low"
         else:
+            self.current_max = number - 1
             return "Too high"
+
     def reset(self):
-        self.__init__()
+        self.number = random.randint(1, 100)
+        self.guesses = 0
+        self.max_guesses = 10
+        self.current_min = 1
+        self.current_max = 100
+
+def update_buttons(min_num, max_num):
+    buttons = []
+
+    step = (max_num - min_num) // 9
+    for i in range(10):
+        guess = min_num + i * step
+        button = KeyboardButton(text=str(guess))
+        buttons.append(button)
+    return ReplyKeyboardMarkup(keyboard=[buttons],
+            resize_keyboard=True)
+
 
 db = {}
 
@@ -55,6 +76,9 @@ async def command_start_handler(message: Message) -> None:
     # Bot instance: `bot.send_message(chat_id=message.chat.id, ...)`
     await message.answer(f"Hello, {hbold(message.from_user.full_name)}!")
     db[message.from_user.id] = Game()
+    await message.answer("I'm thinking of a number between 1 and 100. You have 10 guesses",
+                         reply_markup=update_buttons(1, 100))
+
 
 
 @dp.message(Command("reset"))
@@ -68,6 +92,8 @@ async def command_reset_handler(message: Message) -> None:
     game = db[message.from_user.id]
     game.reset()
     await message.answer("Game reset")
+    await message.answer("I'm thinking of a number between 1 and 100. You have 10 guesses",
+                         reply_markup=update_buttons(1, 100))
 
 
 @dp.message()
@@ -86,7 +112,9 @@ async def handle_guess(message: types.Message) -> None:
     except ValueError:
         await message.answer("Please, enter a number")
         return
-    await message.answer(game.guess(guess))
+    resp = game.guess(guess)
+    kbrd = update_buttons(game.current_min, game.current_max)
+    await message.answer(resp, reply_markup=kbrd)
     if game.guesses >= game.max_guesses:
         del db[message.from_user.id]
 
